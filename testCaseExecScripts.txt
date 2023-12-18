@@ -1,0 +1,5 @@
+coverage run --source d:/PythonDemo -m unittest discover -s d:/PythonDemo/test/
+
+coverage run -m pytest d:/PythonDemo/appTest.py
+
+coverage run -m pytest d:/PythonDemo/playerDataTest.py

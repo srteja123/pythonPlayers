@@ -1,0 +1,40 @@
+from bs4 import BeautifulSoup
+
+# Assuming your HTML content is stored in the variable 'html_content'
+
+# Create BeautifulSoup object
+soup = BeautifulSoup(html_content, 'html.parser')
+
+# Step 1: Find the specific divs containing 'Batting & Fielding' and 'Bowling' string values
+batting_fielding_div = soup.find('div', text='Batting & Fielding')
+bowling_div = soup.find('div', text='Bowling')
+
+# Step 2: Find th string values in the 'thead' tag under 'Batting & Fielding' div
+batting_fielding_thead = batting_fielding_div.find_next('thead', class_='ds-bg-fill-content-alternate ds-text-left ds-text-right')
+batting_fielding_th_values = [th.text.strip() for th in batting_fielding_thead.find_all('th')]
+
+# Step 3: Find td string values in 'tbody' tag under 'Batting & Fielding' div for 'T20s'
+batting_fielding_tbody = batting_fielding_thead.find_next('tbody')
+batting_fielding_t20s_values = [td.text.strip() for td in batting_fielding_tbody.find('td', text='T20s').parent.find_all('td')]
+
+# Step 4: Store values from Step 3 in separate variables
+batting_fielding_th_values_variable = batting_fielding_th_values
+batting_fielding_t20s_values_variable = batting_fielding_t20s_values
+
+# Step 5: Find th string values in the 'thead' tag under 'Bowling' div
+bowling_thead = bowling_div.find_next('thead', class_='ds-bg-fill-content-alternate ds-text-left ds-text-right')
+bowling_th_values = [th.text.strip() for th in bowling_thead.find_all('th')]
+
+# Step 6: Find td string values in 'tbody' tag under 'Bowling' div for 'T20s'
+bowling_tbody = bowling_thead.find_next('tbody')
+bowling_t20s_values = [td.text.strip() for td in bowling_tbody.find('td', text='T20s').parent.find_all('td')]
+
+# Step 7: Store values from Step 5 in separate variables
+bowling_th_values_variable = bowling_th_values
+bowling_t20s_values_variable = bowling_t20s_values
+
+# Outputting the values
+print("Batting & Fielding TH values:", batting_fielding_th_values_variable)
+print("Batting & Fielding T20s values:", batting_fielding_t20s_values_variable)
+print("Bowling TH values:", bowling_th_values_variable)
+print("Bowling T20s values:", bowling_t20s_values_variable)
