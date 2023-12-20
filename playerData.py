@@ -1,4 +1,5 @@
 import sqlite3
+import bs4
 import requests
 from bs4 import BeautifulSoup
 import re,sys,argparse
@@ -33,38 +34,43 @@ def get_player_details(url_values,sqlite_conn,match_types):
     
     cur = sqlite_conn.cursor()
     for urlValue in url_values:
-        cid = urlValue.split('-')[-1]
-        for type_no in match_types:
-            squad_url='https://www.espncricinfo.com/cricketers'+urlValue
+        #try:
+            cid = urlValue.split('-')[-1]
+            for type_no in match_types:
+                squad_url='https://www.espncricinfo.com/cricketers'+urlValue
             
-            squad_page=requests.get(squad_url)
-            soupPlayer=BeautifulSoup(squad_page.text,"html.parser")
-            player_links=soupPlayer.find_all('a',href=re.compile('/cricketers/'))
-            for i in player_links:
-                if i.get('title'):
-                    player_id=i.get('href').split('-')[-1]
-                    player=i.get('title').strip()
-                    player_url=i.get('href')
-                    if type_no == 2:
+                squad_page=requests.get(squad_url)
+                soupPlayer=BeautifulSoup(squad_page.text,"html.parser")
+                player_links=soupPlayer.find_all('a',href=re.compile('/cricketers/'))
+                for i in player_links:
+                    if i.get('title'):
+                        player_id=i.get('href').split('-')[-1]
+                        player=i.get('title').strip()
+                        player_url=i.get('href')
+                        if type_no == 2:
                         
-                        cur.execute('INSERT OR IGNORE INTO Players (country_id,player_id,player,play_link) VALUES (:X, :Y, :Z, :A)',{'X':cid,'Y':player_id,'Z':player, 'A':player_url})
-                        cur.execute("UPDATE Players Set odi_cap ='Y' where country_id=:X AND player_id=:Y AND player=:Z",{'X':cid,'Y':player_id,'Z':player})
+                            cur.execute('INSERT OR IGNORE INTO Players (country_id,player_id,player,play_link) VALUES (:X, :Y, :Z, :A)',{'X':cid,'Y':player_id,'Z':player, 'A':player_url})
+                            cur.execute("UPDATE Players Set odi_cap ='Y' where country_id=:X AND player_id=:Y AND player=:Z",{'X':cid,'Y':player_id,'Z':player})
                         
-                    elif type_no == 3:
-                        cur.execute('INSERT OR IGNORE INTO Players (country_id,player_id,player,play_link) VALUES (:X, :Y, :Z, :A)',{'X':cid,'Y':player_id,'Z':player, 'A':player_url})
-                        cur.execute("UPDATE Players Set t20_cap ='Y' where country_id=:X AND player_id=:Y AND player=:Z",{'X':cid,'Y':player_id,'Z':player})
-            
-            
+                        elif type_no == 3:
+                            cur.execute('INSERT OR IGNORE INTO Players (country_id,player_id,player,play_link) VALUES (:X, :Y, :Z, :A)',{'X':cid,'Y':player_id,'Z':player, 'A':player_url})
+                            cur.execute("UPDATE Players Set t20_cap ='Y' where country_id=:X AND player_id=:Y AND player=:Z",{'X':cid,'Y':player_id,'Z':player})
+
                 sqlite_conn.commit()
+        # except requests.exceptions.HTTPError as err:
+        #     print(f'An HTTP error occurred for URL: {err} {urlValue}')
+        # except requests.exceptions.ConnectionError as err:
+        #     print(f'A connection error occurred for URL : {err} {urlValue}')
+        # except bs4.FeatureNotFound as err:
+        #     print(f'An error occurred while parsing the HTML for URL: {err} {urlValue}')
+        # except Exception as e:
+        #     print(f'Exception error for URL : '+urlValue,e)
+        #     traceback.print_exc()
 
 def get_player_statistics(action,play_list,match_type,sqlite_conn):
     
     cur = sqlite_conn.cursor()
-    i=0
     for play in play_list:
-        i+=1
-        if i%100==0:
-            print(i)
         dict_batting_val={}
         dict_bowling_val={}
         player_name=play[3]
@@ -200,13 +206,21 @@ def get_player_statistics(action,play_list,match_type,sqlite_conn):
                     boundary_fours ,boundary_sixes,Catches_taken, Stumping)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(player_name,Mat,Inns,NO,Runs,HS,Ave,BF,
                     SR,No100s,No50s,Fours,Sixes,Catches,Stumps))
                     sqlite_conn.commit()
+        except requests.exceptions.HTTPError as err:
+            print(f'An HTTP error occurred: {err}')
+            logger.info(play)
+        except requests.exceptions.ConnectionError as err:
+            print(f'A connection error occurred: {err}')
+            logger.info(play)
+        except bs4.FeatureNotFound as err:
+            print(f'An error occurred while parsing the HTML: {err}')
         except Exception as e:
-            print('Exception error for below player:',e)
+            print(f'Exception error for below player:',e)
             traceback.print_exc()
             logger.info(play)
         
 
-def main():    
+def main():
     
     global url
     global year
@@ -296,12 +310,12 @@ def main():
                     balls_faced TEXT,batting_strike_rate TEXT,hundreds_scored TEXT,scores_between_50_and_99 TEXT,
                     boundary_fours TEXT,boundary_sixes TEXT,Catches_taken TEXT, Stumping TEXT)''')
             cur.execute('''CREATE TABLE IF NOT EXISTS Bowling_Stats_T20 (player TEXT,matches_played TEXT,innings_bowled_in TEXT,
-                    balls_bowled TEXT,runs_conceded TEXT,wickets_taken TEXT, 
+                    balls_bowled TEXT,runs_conceded TEXT,wickets_taken TEXT,
                     best_bowling_in_an_innings TEXT,best_bowling_in_a_match TEXT, bowling_average TEXT,economy_rate TEXT,bowling_strike_rate TEXT,
-                    four_wkts_exactly_in_an_inns TEXT,five_wickets_in_an_inns TEXT,ten_wickets_in_an_inns TEXT)''') 
+                    four_wkts_exactly_in_an_inns TEXT,five_wickets_in_an_inns TEXT,ten_wickets_in_an_inns TEXT)''')
         
         
-            sqlite_conn.commit();
+            sqlite_conn.commit()
     
             #print('Created necessary tables in database')
     
@@ -316,7 +330,7 @@ def main():
             with get_db_conn(dbname) as sqlite_conn:
                 cur = sqlite_conn.cursor()
                 cur.execute('SELECT country_id,country FROM Countries')
-                get_player_details(url_values,sqlite_conn,[2,3]) 
+                get_player_details(url_values,sqlite_conn,[2,3])
                 #print('Inserted data into Players table')
     
             ##select country id,name and player id,name from database and fetch player statistics
@@ -332,7 +346,7 @@ def main():
             play_listt20=list()
             for row in cur:
                 play_listt20.append(row)
-############################################################################################################
+
             
             with get_db_conn(dbname) as sqlite_conn:
                 for action in ['batting','bowling']:
@@ -346,8 +360,10 @@ def main():
     elif page.status_code == 404:
         logger.error("Url provided doesn't exist,exiting with error code 404")
         sys.exit(-1)
+    elif page.status_code == 403:
+        logger.error("Url provided is forbidden")
+        sys.exit(-1)
     
     
 if __name__ == "__main__":
     main()
-
