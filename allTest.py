@@ -17,6 +17,7 @@ dbname = 'CRICKET_PERF'
 class CricketParserTestCase(unittest.TestCase):
     def setUp(self):
         self.app = app.test_client()
+        self.app.testing = True
         self.mock_conn = MagicMock()
         self.mock_cursor = self.mock_conn.cursor.return_value
         self.url_values = ["/cricketers/player-one-789", "/cricketers/player-two-012"]
@@ -28,20 +29,23 @@ class CricketParserTestCase(unittest.TestCase):
     def test_index(self):
         response = self.app.get('/')
         self.assertEqual(response.status_code, 200)
-        self.assertIn("<h1>Cricket Parser :)</h1>", response.data.decode('utf-8'))
+        self.assertIn("<h1>Python Players</h1>", response.data.decode('utf-8'))
 
     def test_page_not_found(self):
         response = self.app.get('/nonexistent')
         self.assertEqual(response.status_code, 404)
         self.assertIn("<h1>404</h1><p>The resource could not be found.</p>", response.data.decode('utf-8'))
+
     def test_get_db_conn_success(self):
         with patch('sqlite3.connect', return_value=self.mock_conn):
             conn = get_db_conn('test_db')
             self.assertEqual(conn, self.mock_conn)
+
     def test_get_db_conn_failure(self):
         with patch('sqlite3.connect', side_effect=Exception('test')):
             with self.assertRaises(SystemExit):
                 get_db_conn('test_db')
+
     @patch('app.get_db_conn')
     def test_get_all_countries(self, mock_get_db_conn):
         mock_conn = MagicMock()
@@ -54,6 +58,7 @@ class CricketParserTestCase(unittest.TestCase):
         response = self.app.get('/api/v2/countries/all')
         self.assertEqual(response.status_code, 200)
         self.assertIn("<td>Country_ID</td>", response.data.decode('utf-8'))
+
     def test_get_country_details(self):
         country_links = ['England', 'India']
         selected_countries = ['England', 'Australia']
@@ -64,6 +69,7 @@ class CricketParserTestCase(unittest.TestCase):
             ('1', 'England')
         )
         self.mock_conn.commit.assert_called_once()
+
     def test_get_player_details(self):
         url_values = ['/team/india-6']
         match_types = [2, 3]
@@ -86,6 +92,7 @@ class CricketParserTestCase(unittest.TestCase):
                 get_player_statistics(action, play_list, match_type, self.mock_conn)
                 self.assertFalse(self.mock_cursor.execute.called)
                 #self.mock_conn.commit.assert_called()
+
     def test_get_player_statistics_bowlingODI(self):
         action = 'bowling'
         play_list = [(40, 'Afghanistan', 1059030, 'PlayerName', '/players/player-1')]
@@ -96,6 +103,7 @@ class CricketParserTestCase(unittest.TestCase):
             with patch('bs4.BeautifulSoup', return_value=MagicMock()):
                 get_player_statistics(action, play_list, match_type, self.mock_conn)
                 self.assertFalse(self.mock_cursor.execute.called)
+
     def test_get_player_statistics_bowlingT20(self):
         action = 'bowling'
         play_list = [(40, 'Afghanistan', 1059030, 'Abdul Malik', '/cricketers/abdul-malik-1059030')]
@@ -107,6 +115,7 @@ class CricketParserTestCase(unittest.TestCase):
                 get_player_statistics(action, play_list, match_type, self.mock_conn)
                 self.assertFalse(self.mock_cursor.execute.called)
                 #self.mock_conn.commit.assert_called()
+
 
     @patch('playerData.get_db_conn')
     def test_get_player_statistics_battingT20(self,mock_get_db_conn):
@@ -123,8 +132,7 @@ class CricketParserTestCase(unittest.TestCase):
             with patch('bs4.BeautifulSoup', return_value=MagicMock()):
                 get_player_statistics(action, play_list, match_type, mock_get_db_conn)
                 self.assertFalse(mock_cursor.execute.called)
-    # More test cases can be added for each of the branch conditions within the functions
-    # ...
+    
     @patch('playerData.requests.get')
     def test_main_url_status_code_200(self, mock_get):
         # Setup mock to simulate a successful page response
@@ -170,6 +178,19 @@ class CricketParserTestCase(unittest.TestCase):
         #self.assertIn("<td>1000</td>", response.data.decode('utf-8'))
 
     @patch('app.get_db_conn')
+    def test_get_all_battingstatsODI(self, mock_get_db_conn):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.description = [('Player',), ('Runs',)]
+        mock_cursor.fetchall.return_value = [('Player A', '1000'), ('Player B', '900')]
+        mock_conn.cursor.return_value = mock_cursor
+        mock_get_db_conn.return_value.__enter__.return_value = mock_conn
+
+        response = self.app.get('/api/v2/playerStats/battingODI/all')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("<td>Player</td>", response.data.decode('utf-8'))
+
+    @patch('app.get_db_conn')
     def test_get_all_bowlerstats(self, mock_get_db_conn):
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
@@ -182,6 +203,19 @@ class CricketParserTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("<td>Bowler</td>", response.data.decode('utf-8'))
         #self.assertIn("<td>50</td>", response.data.decode('utf-8'))
+
+    @patch('app.get_db_conn')
+    def test_get_all_bowlerstatsODI(self, mock_get_db_conn):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.description = [('Bowler',), ('Wickets',)]
+        mock_cursor.fetchall.return_value = [('Bowler A', '50'), ('Bowler B', '40')]
+        mock_conn.cursor.return_value = mock_cursor
+        mock_get_db_conn.return_value.__enter__.return_value = mock_conn
+
+        response = self.app.get('/api/v2/playerStats/bowlingODI/all')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("<td>Bowler</td>", response.data.decode('utf-8'))
 
     @patch('playerData.get_db_conn')
     @patch('playerData.BeautifulSoup')
@@ -205,6 +239,7 @@ class CricketParserTestCase(unittest.TestCase):
         
         # Check database calls
         self.assertTrue(mock_db_conn.called)
+
     @patch('app.get_db_conn')
     @patch('app.send_file')
     @patch('pandas.read_sql_query')
@@ -252,6 +287,48 @@ class CricketParserTestCase(unittest.TestCase):
     @patch('pandas.read_sql_query')
     @patch('seaborn.scatterplot')
     @patch('matplotlib.pyplot.savefig')
+    def test_get_all_bowlerstats_plotCheckODI(
+        self, mock_savefig, mock_scatterplot, mock_read_sql, mock_send_file, mock_get_db_conn
+    ):
+        # Arrange
+        mock_conn = MagicMock()
+        mock_get_db_conn.return_value.__enter__.return_value = mock_conn
+        dataframe = pd.DataFrame({
+            'matches_played': ['-', '2', '5'],
+            'wickets_taken': ['-', '4', '7']
+        })
+        mock_read_sql.return_value = dataframe
+        # Mock the send_file to return a BytesIO object simulating an image file
+        mock_send_file.return_value = BytesIO(b"image data")
+
+        # Act
+        response = app.test_client().get('/api/v2/playerStats/bowlingODIPlot/all')
+
+        # Assert
+        # Ensure that a database connection is established
+        mock_get_db_conn.assert_called_with(dbname)
+        # Ensure the SQL query is executed
+        mock_read_sql.assert_called_with("select * from Bowling_Stats_Odi;", mock_conn)
+        # Ensure that '-' is replaced with 0 in dataframe columns
+        pd.testing.assert_series_equal(dataframe['matches_played'], pd.Series([0, 2, 5]), check_names=False)
+        pd.testing.assert_series_equal(dataframe['wickets_taken'], pd.Series([0, 4, 7]), check_names=False)
+        # Ensure that the scatterplot is created
+        mock_scatterplot.assert_called_once()
+        # Ensure that xticks and yticks are set
+        #self.assertEqual(plt.xticks(), ((0, 50), ()))
+        #self.assertEqual(plt.yticks(), ((0, 50), ()))
+        # Ensure that the plot is saved
+        mock_savefig.assert_called_with('BowlerplotODI.png')
+        # Ensure that the plot is sent in the response
+        mock_send_file.assert_called_with('BowlerplotODI.png', mimetype='image/png')
+        self.assertEqual(response.data, b"image data")
+        #self.assertEqual(response.mimetype, 'image/png')
+
+    @patch('app.get_db_conn')
+    @patch('app.send_file')
+    @patch('pandas.read_sql_query')
+    @patch('seaborn.scatterplot')
+    @patch('matplotlib.pyplot.savefig')
     def test_get_all_battingstats_plot(self, mock_savefig, mock_scatterplot, mock_read_sql, mock_send_file, mock_get_db_conn):
         # Set up mock database connection context manager
         mock_conn = MagicMock()
@@ -289,6 +366,50 @@ class CricketParserTestCase(unittest.TestCase):
         mock_savefig.assert_called_once_with('BattingPlot.png')
         # Ensure that the plot is sent in the response
         mock_send_file.assert_called_with('BattingPlot.png', mimetype='image/png')
+        self.assertEqual(response.data, b"image data")
+
+    @patch('app.get_db_conn')
+    @patch('app.send_file')
+    @patch('pandas.read_sql_query')
+    @patch('seaborn.scatterplot')
+    @patch('matplotlib.pyplot.savefig')
+    def test_get_all_battingstats_plotODI(self, mock_savefig, mock_scatterplot, mock_read_sql, mock_send_file, mock_get_db_conn):
+        # Set up mock database connection context manager
+        mock_conn = MagicMock()
+        mock_get_db_conn.return_value.__enter__.return_value = mock_conn
+
+        # Create a dummy DataFrame
+        dataframe = pd.DataFrame({
+            'batting_average': ['-', '50', '60'],
+            'batting_strike_rate': ['-', '80', '90']
+        })
+        mock_read_sql.return_value = dataframe
+        # Mock the send_file to return a BytesIO object simulating an image file
+        mock_send_file.return_value = BytesIO(b"image data")
+
+        response = app.test_client().get('/api/v2/playerStats/battingODIPlot/all')
+
+
+        # Assert that the SQL query was executed
+        mock_get_db_conn.assert_called_once_with(dbname)
+        mock_read_sql.assert_called_with("select * from Batting_Stats_Odi;", mock_conn)
+
+
+        # Assert that the DataFrame was modified as expected
+        pd.testing.assert_series_equal(dataframe['batting_average'], pd.Series([0, 50, 60]), check_names=False)
+        pd.testing.assert_series_equal(dataframe['batting_strike_rate'], pd.Series([0, 80, 90]), check_names=False)
+
+        # Ensure that the scatterplot is created
+        mock_scatterplot.assert_called_once()
+
+        # Assert that xticks and yticks were set
+        #mock_plt.xticks.assert_called_once_with(np.arange(0, max(expected_df['batting_average']) + 1, 10))
+        #mock_plt.yticks.assert_called_once_with(np.arange(0, max(expected_df['batting_strike_rate']) + 1, 50))
+
+        # Ensure that the plot is saved
+        mock_savefig.assert_called_once_with('BattingPlotODI.png')
+        # Ensure that the plot is sent in the response
+        mock_send_file.assert_called_with('BattingPlotODI.png', mimetype='image/png')
         self.assertEqual(response.data, b"image data")
         
     def test_function_with_valid_data(self):
